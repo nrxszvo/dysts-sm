@@ -55,6 +55,7 @@ except ModuleNotFoundError:
     import numpy as np
 
     has_jit = False
+
     # Define placeholder functions
     def jit(func):
         return func
@@ -65,35 +66,37 @@ staticjit = lambda func: staticmethod(
     njit(func)
 )  # Compose staticmethod and jit decorators
 
-data_default = {'bifurcation_parameter': None,
-                'citation': None,
-                 'correlation_dimension': None,
-                 'delay': False,
-                 'description': None,
-                 'dt': 0.001,
-                 'embedding_dimension': 3,
-                 'hamiltonian': False,
-                 'initial_conditions': [0.1, 0.1, 0.1],
-                 'kaplan_yorke_dimension': None,
-                 'lyapunov_spectrum_estimated': None,
-                 'maximum_lyapunov_estimated': None,
-                 'multiscale_entropy': None,
-                 'nonautonomous': False,
-                 'parameters': {},
-                 'period': 10,
-                 'pesin_entropy': None,
-                 'unbounded_indices': []
-               }
+data_default = {
+    "bifurcation_parameter": None,
+    "citation": None,
+    "correlation_dimension": None,
+    "delay": False,
+    "description": None,
+    "dt": 0.001,
+    "embedding_dimension": 3,
+    "hamiltonian": False,
+    "initial_conditions": [0.1, 0.1, 0.1],
+    "kaplan_yorke_dimension": None,
+    "lyapunov_spectrum_estimated": None,
+    "maximum_lyapunov_estimated": None,
+    "multiscale_entropy": None,
+    "nonautonomous": False,
+    "parameters": {},
+    "period": 10,
+    "pesin_entropy": None,
+    "unbounded_indices": [],
+}
+
 
 @dataclass(init=False)
 class BaseDyn:
     """A base class for dynamical systems
-    
+
     Attributes:
         name (str): The name of the system
         params (dict): The parameters of the system.
         random_state (int): The seed for the random number generator. Defaults to None
-        
+
     Development:
         Add a function to look up additional metadata, if requested
     """
@@ -122,15 +125,15 @@ class BaseDyn:
 
         for key in self._load_data().keys():
             setattr(self, key, self._load_data()[key])
-    
+
     def update_params(self):
         """
-        Update all instance attributes to match the values stored in the 
+        Update all instance attributes to match the values stored in the
         `params` field
         """
         for key in self.params.keys():
             setattr(self, key, self.params[key])
-    
+
     def get_param_names(self):
         return sorted(self.params.keys())
 
@@ -144,7 +147,7 @@ class BaseDyn:
             return data[self.name]
         except KeyError:
             print(f"No metadata available for {self.name}")
-            #return {"parameters": None}
+            # return {"parameters": None}
             return data_default
 
     @staticmethod
@@ -156,31 +159,30 @@ class BaseDyn:
     def bound_trajectory(traj):
         """Bound a trajectory within a periodic domain"""
         return np.mod(traj, 2 * np.pi)
-    
 
     def load_trajectory(
         self,
-        subsets="train", 
-        granularity="fine", 
+        subsets="train",
+        granularity="fine",
         return_times=False,
         standardize=False,
-        noise=False
+        noise=False,
     ):
         """
         Load a precomputed trajectory for the dynamical system
-        
+
         Args:
             subsets ("train" |  "test"): Which dataset (initial conditions) to load
             granularity ("course" | "fine"): Whether to load fine or coarsely-spaced samples
             noise (bool): Whether to include stochastic forcing
             standardize (bool): Standardize the output time series.
-            return_times (bool): Whether to return the timepoints at which the solution 
+            return_times (bool): Whether to return the timepoints at which the solution
                 was computed
-                
+
         Returns:
             sol (ndarray): A T x D trajectory
             tpts, sol (ndarray): T x 1 timepoint array, and T x D trajectory
-        
+
         """
         period = 12
         granval = {"coarse": 15, "fine": 100}[granularity]
@@ -190,12 +192,11 @@ class BaseDyn:
             name_parts = list(os.path.splitext(data_path))
             data_path = "".join(name_parts[:-1] + ["_noise"] + [name_parts[-1]])
 
-
         if not _has_data:
             warnings.warn(
-                        "Data module not found. To use precomputed datasets, "+ \
-                            "please install the external data repository "+ \
-                                "\npip install git+https://github.com/williamgilpin/dysts_data"
+                "Data module not found. To use precomputed datasets, "
+                + "please install the external data repository "
+                + "\npip install git+https://github.com/williamgilpin/dysts_data"
             )
 
         base_path = get_datapath()
@@ -204,11 +205,14 @@ class BaseDyn:
         # cwd = os.path.dirname(os.path.realpath(__file__))
         # data_path = os.path.join(cwd, "data", data_path)
 
-        with gzip.open(data_path, 'rt', encoding="utf-8") as file:
+        with gzip.open(data_path, "rt", encoding="utf-8") as file:
             dataset = json.load(file)
-            
-        tpts, sol = np.array(dataset[self.name]['time']), np.array(dataset[self.name]['values'])
-        
+
+        tpts, sol = (
+            np.array(dataset[self.name]["time"]),
+            np.array(dataset[self.name]["values"]),
+        )
+
         if standardize:
             sol = standardize_ts(sol)
 
@@ -221,10 +225,9 @@ class BaseDyn:
         """Make a trajectory for the dynamical system"""
         raise NotImplementedError
 
-    def sample(self, *args,  **kwargs):
+    def sample(self, *args, **kwargs):
         """Sample a trajectory for the dynamical system via numerical integration"""
         return self.make_trajectory(*args, **kwargs)
-        
 
 
 from scipy.integrate import solve_ivp
@@ -257,7 +260,7 @@ class DynSys(BaseDyn):
     def __call__(self, X, t):
         """Wrapper around right hand side"""
         return self.rhs(X, t)
-    
+
     def make_trajectory(
         self,
         n,
@@ -271,25 +274,25 @@ class DynSys(BaseDyn):
     ):
         """
         Generate a fixed-length trajectory with default timestep, parameters, and initial conditions
-        
+
         Args:
             n (int): the total number of trajectory points
             method (str): the integration method
-            resample (bool): whether to resample trajectories to have matching dominant 
+            resample (bool): whether to resample trajectories to have matching dominant
                 Fourier components
             pts_per_period (int): if resampling, the number of points per period
             standardize (bool): Standardize the output time series.
-            return_times (bool): Whether to return the timepoints at which the solution 
+            return_times (bool): Whether to return the timepoints at which the solution
                 was computed
-            postprocess (bool): Whether to apply coordinate conversions and other domain-specific 
+            postprocess (bool): Whether to apply coordinate conversions and other domain-specific
                 rescalings to the integration coordinates
             noise (float): The amount of stochasticity in the integrated dynamics. This would correspond
                 to Brownian motion in the absence of any forcing.
-        
+
         Returns:
             sol (ndarray): A T x D trajectory
             tpts, sol (ndarray): T x 1 timepoint array, and T x D trajectory
-            
+
         """
         tpts = np.arange(n) * self.dt
         np.random.seed(self.random_state)
@@ -302,7 +305,7 @@ class DynSys(BaseDyn):
                 warnings.warn(
                     f"Expect slowdown due to excessive integration required; scale factor {upscale_factor}"
                 )
-            tpts = np.linspace(0, tlim - tlim/n, n)
+            tpts = np.linspace(0, tlim - tlim / n, n)
 
         m = len(np.array(self.ic).shape)
         if m < 1:
@@ -313,15 +316,18 @@ class DynSys(BaseDyn):
             ).T
         else:
             sol = list()
-            for ic in self.ic:
+            for i, ic in enumerate(self.ic):
+                print(f"generating {i+1}/{len(self.ic)} trajectories...", end="\r")
                 traj = integrate_dyn(
                     self, ic, tpts, dtval=self.dt, method=method, noise=noise
                 )
-                check_complete = (traj.shape[-1] == len(tpts))
-                if check_complete: 
+                check_complete = traj.shape[-1] == len(tpts)
+                if check_complete:
                     sol.append(traj)
                 else:
-                    warnings.warn(f"Integration did not complete for initial condition {ic}, skipping this point")
+                    warnings.warn(
+                        f"Integration did not complete for initial condition {ic}, skipping this point"
+                    )
                     pass
             sol = np.transpose(np.array(sol), (0, 2, 1))
 
@@ -347,13 +353,13 @@ class DynMap(BaseDyn):
     """
     A dynamical system base class, which loads and assigns parameter
     values from a file
-    
+
     Args:
         params (list): parameter values for the differential equations
         kwargs (dict): A dictionary of keyword arguments passed to the base dynamical
             model class
-    
-    Todo: 
+
+    Todo:
         A function to look up additional metadata, if requested
     """
 
@@ -387,12 +393,12 @@ class DynMap(BaseDyn):
         """
         Generate a fixed-length trajectory with default timestep,
         parameters, and initial condition(s)
-        
+
         Args:
             n (int): the length of each trajectory
             inverse (bool): whether to reverse a trajectory
             standardize (bool): Standardize the output time series.
-            return_times (bool): Whether to return the timepoints at which the solution 
+            return_times (bool): Whether to return the timepoints at which the solution
                 was computed
         """
 
@@ -432,22 +438,21 @@ class DynMap(BaseDyn):
             return sol
 
 
-
 class DynSysDelay(DynSys):
     """
     A delayed differential equation object. Defaults to using Euler integration scheme
-    The delay timescale is assumed to be the "tau" field. The embedding dimension is set 
+    The delay timescale is assumed to be the "tau" field. The embedding dimension is set
     by default to ten, but delay equations are infinite dimensional.
     Uses a double-ended queue for memory efficiency
 
     Attributes:
         kwargs (dict): A dictionary of keyword arguments passed to the dynamical
             system parent class
-    
+
     Todo:
         Treat previous delay values as a part of the dynamical variable in rhs
-    
-        Currently, only univariate delay equations and single initial conditons 
+
+        Currently, only univariate delay equations and single initial conditons
         are supported
     """
 
@@ -478,38 +483,38 @@ class DynSysDelay(DynSys):
         postprocess=True,
     ):
         """
-        Generate a fixed-length trajectory with default timestep, parameters, and 
+        Generate a fixed-length trajectory with default timestep, parameters, and
         initial conditions.
-        
+
         Args:
             n (int): the total number of trajectory points
             d (int): the number of embedding dimensions to return
             method (str): Not used. Currently Euler is the only option here
             noise (float): The amplitude of brownian forcing
-            resample (bool): whether to resample trajectories to have matching dominant 
+            resample (bool): whether to resample trajectories to have matching dominant
                 Fourier components
             pts_per_period (int): if resampling, the number of points per period
             standardize (bool): Standardize the output time series.
-            return_times (bool): Whether to return the timepoints at which the solution 
+            return_times (bool): Whether to return the timepoints at which the solution
                 was computed
-            
+
         Todo:
             Support for multivariate and multidelay equations with multiple deques
             Support for multiple initial conditions
-            
+
         """
         np.random.seed(self.random_state)
         n0 = n
 
         ## history length proportional to the delay time over the timestep
         mem_stride = int(np.ceil(self.tau / self.dt))
-        
+
         ## If resampling is performed, calculate the true number of timesteps for the
         ## Euler loop
         if resample:
             num_periods = n / pts_per_period
             num_timesteps_per_period = self.period / self.dt
-            nt = int(np.ceil(num_timesteps_per_period *  num_periods))
+            nt = int(np.ceil(num_timesteps_per_period * num_periods))
         else:
             nt = n
 
@@ -521,10 +526,10 @@ class DynSysDelay(DynSys):
         n += (d + 1) * clipping
         nt += (d + 1) * mem_stride
 
-        ## If passed initial conditions are sufficient, then use them. Otherwise, 
+        ## If passed initial conditions are sufficient, then use them. Otherwise,
         ## pad with with random initial conditions
         values = self.ic[0] * (1 + 0.2 * np.random.rand(1 + mem_stride))
-        values[-len(self.ic[-mem_stride:]):] = self.ic[-mem_stride:]
+        values[-len(self.ic[-mem_stride:]) :] = self.ic[-mem_stride:]
         history = collections.deque(values)
 
         ## pre-allocate full solution
@@ -583,13 +588,14 @@ class DynSysDelay(DynSys):
         else:
             return sol0
 
+
 def get_attractor_list(model_type="continuous"):
     """
     Returns the names of all models in the package
-    
+
     Args:
         model_type (str): "continuous" (default) or "discrete"
-        
+
     Returns:
         attractor_list (list of str): The names of all attractors in database
     """
@@ -603,32 +609,32 @@ def get_attractor_list(model_type="continuous"):
     return attractor_list
 
 
-def make_trajectory_ensemble(n, subset=None, use_multiprocessing=False, random_state=None, **kwargs):
+def make_trajectory_ensemble(
+    n, subset=None, use_multiprocessing=False, random_state=None, **kwargs
+):
     """
     Integrate multiple dynamical systems with identical settings
-    
+
     Args:
         n (int): The number of timepoints to integrate
         subset (list): A list of system names. Defaults to all systems
         use_multiprocessing (bool): Not yet implemented.
         random_state (int): The random seed to use for the ensemble
         kwargs (dict): Integration options passed to each system's make_trajectory() method
-    
+
     Returns:
         all_sols (dict): A dictionary containing trajectories for each system
-    
+
     """
     if not subset:
         subset = get_attractor_list()
 
     if use_multiprocessing:
-        warnings.warn(
-            "Multiprocessing not implemented."
-        )
-    
+        warnings.warn("Multiprocessing not implemented.")
+
     # We run this inside the function scope to avoid a circular import issue
     flows = importlib.import_module("dysts.flows", package=".flows")
-    
+
     all_sols = dict()
     for equation_name in subset:
         eq = getattr(flows, equation_name)()
