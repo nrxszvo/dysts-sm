@@ -5,7 +5,7 @@ The original README from that repo follows...
 
 Analyze more than a hundred chaotic systems.
 
-![An embedding of all chaotic systems in the collection](dysts-sm/data/fig_github.png)
+![An embedding of all chaotic systems in the collection](data/fig_github.png)
 
 ## Basic Usage
 
